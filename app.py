@@ -79,25 +79,17 @@ def apply_false_color(image):
 
 @app.route('/sandbox', methods=['POST'])
 def sandbox():
-    ### Get the data from the request
-    # Parse the JSON body
-    data = request.get_json()
-    if not data:
-        return jsonify({'error': 'Invalid JSON body'}), 400
+    # Get width and height from query parameters
+    width = request.args.get('width', type=int)
+    height = request.args.get('height', type=int)
 
-    width = data.get('width')
-    height = data.get('height')
-    pixel_data = data.get('data')
+    if width is None or height is None:
+        return jsonify({'error': 'Missing width or height'}), 400
 
-    # Check if the width, height, and pixel data are present
-    if not all([height, width, pixel_data]):
-        return jsonify({'error': 'Missing width, height, or data'}), 400
-
-    # Cast the pixel data to a numpy array and reshape it
+    # Get the pixel data from the request body
     try:
-        pixel_data = np.array(pixel_data, dtype=np.float32)
-        depthImage = pixel_data.reshape((height,width, -1))
-        depthImage.squeeze()
+        pixel_data = np.frombuffer(request.data, dtype=np.float32)
+        depthImage = pixel_data.reshape((height, width))
         depthImage = np.flipud(depthImage)
     except Exception as e:
         return jsonify({'error': str(e)}), 400
