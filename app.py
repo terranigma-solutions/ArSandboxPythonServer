@@ -82,6 +82,11 @@ def sandbox():
     # Get width and height from query parameters
     width = request.args.get('width', type=int)
     height = request.args.get('height', type=int)
+    minDepth = request.args.get('minDepth', type=float)
+    maxDepth = request.args.get('maxDepth', type=float)
+
+    print("minDepth: ", minDepth)
+    print("maxDepth: ", maxDepth)
 
     if width is None or height is None:
         return jsonify({'error': 'Missing width or height'}), 400
@@ -109,7 +114,7 @@ def sandbox():
     buffer.seek(0)
     img_str = base64.b64encode(buffer.getvalue()).decode('utf-8')
 
-    # Return the false color image
+    # Return the image. the image can have any size. The sandbox will resize it to fit the display
     return jsonify({'image': img_str})
 
 if __name__ == '__main__':
