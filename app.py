@@ -9,37 +9,6 @@ import numpy as np
 
 app = Flask(__name__)
 
-@app.route('/testImage', methods=['GET'])
-def process_image():
-    ### Get the data from the request
-    # Parse the JSON body
-    data = request.get_json()
-    if not data:
-        return jsonify({'error': 'Invalid JSON body'}), 400
-
-    width = data.get('width')
-    height = data.get('height')
-    pixel_data = data.get('data')
-
-    print("Width: ", width)
-    print("Height: ", height)
-    # Load the image from the hard drive
-    image_path = 'C:\\Users\\svirg\\Downloads\\testRescaled.png'
-
-    # Check if the image path exists
-    if not os.path.exists(image_path):
-        return jsonify({'error': 'Image path does not exist'}), 404
-        print("Image path does not exist")
-
-    image = plt.imread(image_path)
-
-    # Convert the image to a format that can be sent in the response
-    buffer = io.BytesIO()
-    plt.imsave(buffer, image, format='png')
-    buffer.seek(0)
-    img_str = base64.b64encode(buffer.getvalue()).decode('utf-8')
-    return jsonify({'image': img_str})
-
 
 def apply_false_color(image):
     # Check the shape of the image data
