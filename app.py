@@ -3,7 +3,6 @@ import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 import io
 import base64
-import os
 import numpy as np
 
 
