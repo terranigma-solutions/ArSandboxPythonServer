@@ -5,85 +5,72 @@ import io
 import base64
 import numpy as np
 
-
 app = Flask(__name__)
 
-
 def apply_false_color(image):
-    # Check the shape of the image data
-    if len(image.shape) == 3 and image.shape[2] == 1:
-        # Squeeze the single channel dimension
-        image = image.squeeze(axis=2)
-    elif len(image.shape) != 2:
-        raise TypeError(f"Invalid shape {image.shape} for image data")
-
-    # Create a colormap
     viridis = plt.get_cmap('viridis')
-
-    # Normalize the data to the range min-max
     norm = mcolors.Normalize(vmin=image.min(), vmax=image.max())
-
-    # Apply the colormap to values between min and max
     colored_image = viridis(norm(image))
-
-    # Set values <= min to black
     colored_image[image <= image.min()] = [0, 0, 0, 1]
-
-    # Set values >= max to white
     colored_image[image >= image.max()] = [1, 1, 1, 1]
-
-    # Print the dimensions of the colored image
-    print("Colored image dimensions:", colored_image.shape)
-
-    # Verify the shape of colored_image before plotting
-    if len(colored_image.shape) != 3 or colored_image.shape[2] != 4:
-        raise TypeError(f"Invalid shape {colored_image.shape} for colored image data")
-
-    # Plot the colored image for debugging
-
-
     return colored_image
 
+class SandboxFrame:
+    def __init__(self, request):
+        self.request = request
+        self.width = None
+        self.height = None
+        self.minDepth = None
+        self.maxDepth = None
+        self.depthImage = None
+        try:
+            self.extract_parameters()
+            self.extract_pixel_data()
+        except ValueError as e:
+            self.error = str(e)
+        else:
+            self.error = None
+
+    def extract_parameters(self):
+        self.width = self.request.args.get('width', type=int)
+        self.height = self.request.args.get('height', type=int)
+        self.minDepth = self.request.args.get('minDepth', type=float)
+        self.maxDepth = self.request.args.get('maxDepth', type=float)
+
+        if self.width is None or self.height is None:
+            raise ValueError('Missing width or height')
+
+    def extract_pixel_data(self):
+        try:
+            pixel_data = np.frombuffer(self.request.data, dtype=np.float32)
+            self.depthImage = pixel_data.reshape((self.height, self.width))
+            self.depthImage = np.flipud(self.depthImage)
+
+            if len(self.depthImage.shape) == 3 and self.depthImage.shape[2] == 1:
+                self.depthImage = self.depthImage.squeeze(axis=2)
+            elif len(self.depthImage.shape) != 2:
+                raise TypeError(f"Invalid shape {self.depthImage.shape} for image data")
+        except Exception as e:
+            raise ValueError(str(e))
+
+    def convert_image_to_response(self, false_color_image):
+        buffer = io.BytesIO()
+        plt.imsave(buffer, false_color_image, format='png')
+        buffer.seek(0)
+        img_str = base64.b64encode(buffer.getvalue()).decode('utf-8')
+        return jsonify({'image': img_str})
+
+    def handle_error(self):
+        return jsonify({'error': self.error}), 400
 
 @app.route('/sandbox', methods=['POST'])
 def sandbox():
-    # Get width and height from query parameters
-    width = request.args.get('width', type=int)
-    height = request.args.get('height', type=int)
-    minDepth = request.args.get('minDepth', type=float)
-    maxDepth = request.args.get('maxDepth', type=float)
+    frame = SandboxFrame(request)
+    if frame.error:
+        return frame.handle_error()
 
-    print("minDepth: ", minDepth)
-    print("maxDepth: ", maxDepth)
-
-    if width is None or height is None:
-        return jsonify({'error': 'Missing width or height'}), 400
-
-    # Get the pixel data from the request body
-    try:
-        pixel_data = np.frombuffer(request.data, dtype=np.float32)
-        depthImage = pixel_data.reshape((height, width))
-        depthImage = np.flipud(depthImage)
-    except Exception as e:
-        return jsonify({'error': str(e)}), 400
-
-### Do something with the image data here
-
-
-    false_color_image = apply_false_color(depthImage)
-
-
-### Return the image data as a response to display in the sandbox
-
-    # Convert the false color image to a format that can be sent in the response
-    buffer = io.BytesIO()
-    plt.imsave(buffer, false_color_image, format='png')
-    plt.show()
-    buffer.seek(0)
-    img_str = base64.b64encode(buffer.getvalue()).decode('utf-8')
-
-    # Return the image. the image can have any size. The sandbox will resize it to fit the display
-    return jsonify({'image': img_str})
+    false_color_image = apply_false_color(frame.depthImage)
+    return frame.convert_image_to_response(false_color_image)
 
 if __name__ == '__main__':
     app.run(debug=True)
